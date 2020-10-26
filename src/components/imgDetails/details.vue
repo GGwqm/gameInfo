@@ -83,7 +83,7 @@
       name: "details",
       data(){
           return{
-            imgUrl:'',own:'',id:'',userMessage:'',likeCount:'',collectCount:'',data:'',randomImg: '',
+            imgUrl:'',own:'',id:'',userMessage:'',likeCount:'',collectCount:'',data:'',randomImg: '',collectId:'',
             like:true,myCollect:true,btn_comm:false,iconLoad:false,moreBtn:false,
             comList:5,
             commentList:[],
@@ -108,21 +108,10 @@
         this.id=this.$route.query.id;
 
         this.loginJudges();
-        //获取此图片的上传用户信息
-        const query = Bmob.Query('upImg');
-        query.include('own');
-        query.get(this.id).then(res => {
-          this.own=res;
-        }).catch(err => {
-          console.log(err)
-        });
-        //获取每日随机推荐
-        const queryHot = Bmob.Query("upImg");
-        queryHot.equalTo("selected", "==", true);
-        queryHot.find().then(res => {
-          this.randomImg=res;
-          this.randomImgClick();
-        });
+
+        this.getUpUser();
+
+        this.getRandomImg();
         this.likeJudge();
         this.collectJudge();
         this.commentJudge();
@@ -135,6 +124,25 @@
           }else {
             this.loginJudge=true;
           }
+        },
+        //获取每日随机推荐
+        getRandomImg(){
+          const queryHot = Bmob.Query("upImg");
+          queryHot.equalTo("selected", "==", true);
+          queryHot.find().then(res => {
+            this.randomImg=res;
+            this.randomImgClick();
+          });
+        },
+        //获取此图片的上传用户信息
+        getUpUser(){
+          const query = Bmob.Query('upImg');
+          query.include('own');
+          query.get(this.id).then(res => {
+            this.own=res;
+          }).catch(err => {
+            console.log(err)
+          });
         },
         //评论判断
         commentJudge(){
@@ -236,12 +244,21 @@
             query.get(this.id).then(res => {
               res.set('collect', relID); // 将Relation对象保存到two字段中，即实现了一对多的关联
               res.save();
-              this.myCollect = false;
-              this.collectJudge();
-              this.$Notice.success({
-                title: '收藏成功',
-                duration: 1
-              });
+              const relation = Bmob.Relation('upImg');// 需要关联的表
+              const relimgID = relation.add(this.id);//关联表中需要关联的objectId, 返回一个Relation对象, add方法接受string和array的类型参数
+              const query = Bmob.Query('_User');
+              query.get(this.userMessage.objectId).then(res => {
+                res.set('myCollect',relimgID); // 将Relation对象保存到two字段中，即实现了一对多的关联
+                res.save();
+                this.myCollect = false;
+                setTimeout(()=>{
+                  this.collectJudge();
+                },200)
+                this.$Notice.success({
+                  title: '收藏成功',
+                  duration: 1
+                });
+              })
             })
           }
         },
@@ -253,12 +270,21 @@
           query.get(this.id).then(res => {
             res.set('collect',relID);
             res.save();
-            this.myCollect=true;
-            this.collectJudge();
-            this.$Notice.success({
-              title: '取消收藏',
-              duration: 1
-            });
+            const relation = Bmob.Relation('upImg');// 需要关联的表
+            const relimgID = relation.remove(this.id);//关联表中需要关联的objectId, 返回一个Relation对象, add方法接受string和array的类型参数
+            const query = Bmob.Query('_User');
+            query.get(this.userMessage.objectId).then(res => {
+              res.set('myCollect',relimgID); // 将Relation对象保存到two字段中，即实现了一对多的关联
+              res.save();
+              this.myCollect = true;
+              setTimeout(()=>{
+                this.collectJudge();
+              },200)
+              this.$Notice.success({
+                title: '取消收藏',
+                duration: 1
+              });
+            })
           })
         },
         //推荐图片跳转详情

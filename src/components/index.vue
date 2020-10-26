@@ -64,7 +64,7 @@
                 </ul>
               </div>
             </div>
-            <Button type="success" shape="circle" icon="md-cloud-upload" @click="upImg('tab2')">上传</Button>
+            <Button type="success" shape="circle" icon="md-cloud-upload" @click="upImg('tab3')">上传</Button>
           </div>
         </nav>
         <Modal v-model="modal" width="450"  @on-visible-change="modalChange(modal)">

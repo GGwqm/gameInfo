@@ -43,6 +43,7 @@
         this.$Loading.start();
         const query = Bmob.Query("upImg");
         query.equalTo("category", "==", "矢量");
+        query.equalTo("checked", "==", true);
         query.find().then(res => {
           this.data=res;
           if(this.data!==[]){

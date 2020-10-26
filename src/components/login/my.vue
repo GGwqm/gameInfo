@@ -15,7 +15,7 @@
     </div>
     <div class="content-before"></div>
     <Content class="content">
-      <Tabs v-model="tabs" :animated="false" >
+      <Tabs v-model="tabs" :animated="false" @on-click="tabClick">
         <TabPane label="我的投稿" name="tab1" icon="ios-videocam" >
           <Row :gutter="16">
             <Col span="24">
@@ -45,7 +45,7 @@
               </div>
             </Col>
             <Col span="8" v-for="(item,index) in showList" :key="index" v-show="showList">
-              <div>
+              <div @click="clickMyUp(item.objectId,item.imgUrl,item.checked)">
                 <Card class="myUpImgCard" >
                   <div class="myUpImg_div">
                     <div>
@@ -95,7 +95,61 @@
             <Page :total="dataCount" :page-size="pageSize" show-total @on-change="chagePage"/>
           </div>
         </TabPane>
-        <TabPane label="发布图片" name="tab2" icon="ios-document">
+        <TabPane label="我的收藏" name="tab2" icon="md-star" >
+          <Row :gutter="16">
+            <Col span="24">
+              <div class="div_choice1">
+                <div>
+                  <RadioGroup v-model="choice1" type="button" @on-change="choice1Change()">
+                    <Radio label="全部"></Radio>
+                    <Radio label="图片"></Radio>
+                    <Radio label="插画"></Radio>
+                    <Radio label="矢量"></Radio>
+                    <Radio label="壁纸"></Radio>
+                  </RadioGroup>
+                </div>
+              </div>
+            </Col>
+            <Col span="24" v-show="listNull">
+              <div class="div_null">
+                <img src="http://abc.huanpl.top/2020/09/02/8083e70f400a08d380c738ad0ca1733e.png" class="imgNull">
+              </div>
+            </Col>
+            <Col span="8" v-for="(item,index) in showList" :key="index" v-show="showList">
+              <div @click="clickCollect(item.objectId,item.imgUrl)">
+                <Card class="myUpImgCard" >
+                  <div class="myUpImg_div">
+                    <div>
+                      <img :src="item.imgUrl" class="myUpImg">
+                      <div class="myUpImg_s">
+                        <div>浏览：50</div>
+                        <div>收藏：10</div>
+                      </div>
+                    </div>
+                    <div class="myUpImgTag">
+                      <div>标签：</div>
+                      <Tag color="volcano" v-for="(items,index) in item.tagArr" :key="index">{{items}}</Tag>
+                    </div>
+                    <div class="myUpImgCheck myCollectImgCheck">
+                      <div>
+                        <Dropdown trigger="click" style="cursor: pointer" placement="bottom-end">
+                          <Icon type="md-menu" size="15"/>
+                          <DropdownMenu slot="list">
+                            <DropdownItem ><div @click="myCollectDelete(item.objectId)">删除收藏</div></DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </Col>
+          </Row>
+          <div class="FenYe" v-show="fenye">
+            <Page :total="dataCount" :page-size="pageSize" show-total @on-change="chagePage"/>
+          </div>
+        </TabPane>
+        <TabPane label="发布图片" name="tab3" icon="ios-document">
           <div class="cardDiv">
             <Card >
               <ul>
@@ -141,7 +195,7 @@
           </div>
 
         </TabPane>
-        <TabPane label="修改信息" name="tab3" icon="md-key">
+        <TabPane label="修改信息" name="tab4" icon="md-key">
           <div class="revise_div">
             <Row :gutter="16">
               <Col span="8">
@@ -309,13 +363,27 @@
       },
       methods:{
         mylogo(){
-          this.tabs="tab3"
+          this.tabs="tab4"
         },
         enter(){
           this.mouselogo=true
         },
         leave(){
           this.mouselogo=false
+        },
+        //投稿/收藏tab切换
+        tabClick(name){
+          this.listNull=false;
+          this.myUpImgText=[];
+          this.totalList=[];
+          this.dataCount=0;
+          this.showList=[];
+          this.choice1='全部';
+          if(name==='tab1'){
+            this.myupList()
+          }else if(name==='tab2'){
+            this.myCollectList()
+          }
         },
         //上传头像地址
         fileUp(){
@@ -522,19 +590,72 @@
             onOk: () => {
               const query = Bmob.Query('upImg');
               query.destroy(objectId).then(res => {
+                this.listNull=false;
+                this.myUpImgText=[];
+                this.totalList=[];
+                this.dataCount=0;
+                this.showList=[];
                 this.myupList()
               }).catch(err => {
               })
             },
-            onCancel: () => {
-
-            }
+            onCancel: () => {}
+          })
+        },
+        //删除收藏按钮
+        myCollectDelete(objectId){
+          const relation = Bmob.Relation('_User');
+          const relID = relation.remove(this.userMessage.objectId);
+          const query = Bmob.Query('upImg');
+          query.get(objectId).then(res => {
+            res.set('collect',relID);
+            res.save();
+            const relation = Bmob.Relation('upImg');// 需要关联的表
+            const relimgID = relation.remove(objectId);//关联表中需要关联的objectId, 返回一个Relation对象, add方法接受string和array的类型参数
+            const query = Bmob.Query('_User');
+            query.get(this.userMessage.objectId).then(res => {
+              res.set('myCollect',relimgID); // 将Relation对象保存到two字段中，即实现了一对多的关联
+              res.save();
+              this.listNull=false;
+              this.myUpImgText=[];
+              this.totalList=[];
+              this.dataCount=0;
+              this.showList=[];
+              this.myCollectList();
+              this.$Notice.success({
+                title: '取消收藏',
+                duration: 1
+              });
+            })
           })
         },
         //获取用户投稿内容
         myupList(){
           const my_ImgText = Bmob.Query('_User');
           my_ImgText.field('myUp',this.userMessage.objectId);
+          my_ImgText.order("-createdAt");
+          my_ImgText.relation('upImg').then(res => {
+            if(res.results.length===0){
+              this.listNull=true;
+              this.fenye=false;
+            }else {
+              this.listNull=false;
+              this.myUpImgText=res.results;
+              this.totalList=this.myUpImgText;
+              this.dataCount=this.myUpImgText.length;
+              this.fenye=true;
+              if(this.dataCount<this.pageSize){
+                this.showList=this.totalList
+              }else {
+                this.showList=this.totalList.slice(0,this.pageSize)
+              }
+            }
+          })
+        },
+        //获取用户收藏内容
+        myCollectList(){
+          const my_ImgText = Bmob.Query('_User');
+          my_ImgText.field('myCollect',this.userMessage.objectId);
           my_ImgText.order("-createdAt");
           my_ImgText.relation('upImg').then(res => {
             if(res.results.length===0){
@@ -648,6 +769,24 @@
             this.checkShow=false;
             this.choice1ChangeCon();
           }
+          if(this.tabs==='tab1'){
+            if(this.choice1==='全部'){
+              this.choice2='';
+              this.checkShow=true;
+              this.myupList();
+            }else {
+              this.checkShow=false;
+              this.choice1ChangeCon();
+            }
+          }else if(this.tabs==='tab2'){
+            if(this.choice1==='全部'){
+              this.choice2='';
+              this.myCollectList();
+            }else {
+              this.checkShow=false;
+              this.choice1ChangeCon();
+            }
+          }
         },
         //审查单选框
         choice2Check(){
@@ -679,12 +818,39 @@
               }
             }
           });
+        },
+        //点击收藏内容
+        clickCollect(id,url){
+          this.$router.push({
+            path: '/details',
+            query: {
+              url: url,
+              id:id,
+            }
+          })
+        },
+        //点击投稿内容
+        clickMyUp(id,url,checked){
+          if(checked===true){
+            this.$router.push({
+              path: '/details',
+              query: {
+                url: url,
+                id:id,
+              }
+            })
+          }else {
+            this.$Notice.warning({
+              title: '通过审核后才能浏览',
+            });
+          }
         }
       },
       created(){
         this.tabs=this.$route.query.id;
         this.getUser();
-        this.myupList()
+        this.myupList();
+        this.choice1Change();
       },
 
     }
@@ -843,6 +1009,9 @@
     margin-top: 40px;
     color: #a699a6;
     font-size: 12px;
+  }
+  .myCollectImgCheck{
+    justify-content: flex-end;
   }
   .myUpImgCard{
     width: 100%;
